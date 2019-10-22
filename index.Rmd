@@ -1,0 +1,190 @@
+---
+title: "Cactus Architecture Temperature"
+author: "Malory Owen & Christopher Lortie"
+date: "October 22, 2019"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+```{r, libraries, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(kableExtra)
+library(ggpubr)
+library(tidyverse)
+library(reshape)
+library(reshape2)
+library(ggmap)
+library(DT)
+
+register_google(key="AIzaSyC3izk0qKmEBZf5hx0tVUwx-bqxi8TVY5Q")
+```
+
+
+
+##Data
+```{r, datasets, warning=FALSE}
+#Bring in relevant datasets
+hobo <- read.csv("~/Masters/Cactus-Architecture-Temperature/data/cactus_architecture_temperature.csv")
+
+hobo.specs <- read.csv("~/Masters/Cactus-Architecture-Temperature/data/pendant_specs.csv")
+head(hobo.specs)
+
+#Join hobo.specs to hobo file
+hobo <- left_join(hobo, hobo.specs, by = "cactus")
+hobo$X <- NULL
+
+#remove na (from cactus 6 and 8)
+hobo <- na.omit(hobo, col = c(5:6))
+
+#Get stat summaries by cactus in neat dataframe
+summary1 <- hobo %>% group_by(cactus) %>% summarise_at(vars(temp), funs(mean, sd, min, max))
+summary2 <- hobo %>% group_by(cactus) %>% summarise_at(vars(light), funs(mean, sd, min, max))
+summary <- left_join(summary1, summary2, by = "cactus")
+names(summary) <- c("cactus", "mean.temp", "sd.temp", "min.temp", "max.temp", "mean.light", "sd.light", "min.light", "max.light")
+summary <- mutate(summary, sd.min.temp = mean.temp - sd.temp) 
+summary <-  mutate(summary, sd.max.temp = mean.temp + sd.temp)
+summary <-  mutate(summary, sd.min.light = mean.light - sd.light)
+summary <-  mutate(summary, sd.max.light = mean.light + sd.light)
+
+
+
+#Get stat summaries by architecture in neat dataframe
+summary3 <- hobo %>% group_by(architecture) %>% summarise_at(vars(temp), funs(mean, sd, min, max))
+summary4 <- hobo %>% group_by(architecture) %>% summarise_at(vars(light), funs(mean, sd, min, max))
+summary.arch <- left_join(summary3, summary4, by = "architecture")
+names(summary.arch) <- c("architecture", "mean.temp", "sd.temp", "min.temp", "max.temp", "mean.light", "sd.light", "min.light", "max.light")
+summary.arch <- mutate(summary.arch, sd.min.temp = mean.temp - sd.temp) 
+summary.arch <-  mutate(summary.arch, sd.max.temp = mean.temp + sd.temp)
+summary.arch <-  mutate(summary.arch, sd.min.light = mean.light - sd.light)
+summary.arch <-  mutate(summary.arch, sd.max.light = mean.light + sd.light)
+
+
+
+```
+
+##Viz
+###Map
+```{r, Viz maps, warning=FALSE}
+#Map the cacti
+#basemap
+cali <- get_map(location = c(lon = -115.663, lat = 34.7825), zoom = 18, color="bw")
+arch.map <- ggmap(cali)
+
+#points
+arch.map <- arch.map +
+  geom_point(data=hobo.specs, aes(x=lon, y=lat, colour = experiment, group = experiment), alpha = 3/10, size =4) +
+  labs(title = "Cactus architecture influence on temperature/light", x = "longitude", y = "latitude", color = "experiment") 
+arch.map
+
+```
+
+###Graphs
+```{r, viz graphs, warning=FALSE}
+#Temperature throughout both experiments, raw data
+temp <- ggplot(hobo, aes(x = date.time, y = temp, colour = experiment)) +
+  geom_line() +
+  theme(axis.text.x = element_blank()) +
+  labs(title = "Temperature through both experiments", x = "Time", y = "Tempearture (F)", color = "Experiment")
+temp 
+
+#Light throughout both experiments, raw dat
+light <- ggplot(hobo, aes(x = date.time, y = light, colour = experiment)) +
+  geom_line() +
+  theme(axis.text.x = element_blank()) +
+  labs(title = "Light intensity through both experiments", x = "Time", y = "Light (Lumens/ft^2)", color = "Experiment")
+light
+
+
+
+#mean temperatures of each cactus
+#first as a bargraph
+temp.mean.bar <- ggplot(summary, aes(x = cactus, y = mean.temp)) +
+  geom_bar(stat = "identity") + geom_errorbar(summary, mapping = aes(ymin = sd.min.temp, ymax = sd.max.temp)) +
+  labs(title = "Mean temperatures of each cactus", x = "Cactus ID", y = "Mean Temperature (F)") +
+  scale_x_continuous(breaks=seq(1, 20, 1)) +
+  theme_minimal()
+temp.mean.bar
+
+#then as a boxplot
+temp.mean.boxplot <- ggplot(hobo, aes(x = cactus, y = temp, group = cactus)) +
+  geom_boxplot() +
+  labs(title = "Mean temperatures of each cactus", x = "Cactus ID", y = "Mean temperature (F)") +
+  theme_minimal()
+temp.mean.boxplot
+
+#mean light intensity for each cactus
+light.mean.bar <- ggplot(summary, aes(x = cactus, y = mean.light)) +
+  geom_bar(stat = "identity") + geom_errorbar(summary, mapping = aes(ymin = sd.min.temp, ymax = sd.max.temp)) + 
+  labs(title = "Mean light intensity of each cactus", x = "Cactus ID", y = "Mean Light Intensity (Lumns/ft^2)") + 
+  scale_x_continuous(breaks=seq(1, 20, 1)) +
+  theme_minimal()
+light.mean.bar
+
+#then as a boxplot
+light.mean.boxplot <- ggplot(hobo, aes(x = cactus, y = light, group = cactus)) +
+  geom_boxplot() +
+  labs(title = "Mean light intensity of each cactus", x = "Cactus ID", y = "Mean temperature (F)") +
+  theme_minimal()
+light.mean.boxplot
+
+```
+
+##Modelling
+###Temperature and Light Intensity
+```{r, models, warning=FALSE}
+#Some simple modelling
+
+#Is it normal? 
+#Can't use shaprio test because it's over 5000 samples, so let's just do some normal q-q plots
+qqnorm(hobo$temp)
+#looks pretty normal
+qqnorm(hobo$light)
+#looks pretty normal
+#Good to go ahead with parametric tests
+
+#test for temperature and light correlation
+cor.test(hobo$temp, hobo$light, method = "pearson")
+#They are indeed correlated (p < 2.2e-16 & R = 0.54, so they are positively correlated)
+
+#Visualize correlation
+temp.light.cor <- ggscatter(hobo, x = "temp", y = "light", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Temperature (F)", ylab = "Light Intensity (lumens/ft^2")
+temp.light.cor
+
+#yikes not very pretty, let's try it with means
+mean.cor <- ggscatter(summary, x = "mean.temp", y = "mean.light", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          xlab = "Temperature (F)", ylab = "Light Intensity (lumens/ft^2")
+mean.cor
+#Interestingly, the means are not correlated. Actually, that makes perfect sense...
+
+#Test for difference between architecture types
+#Temperature
+arch.temp.anova <- aov(hobo$temp ~ hobo$architecture)
+summary(arch.temp.anova)
+#big significance! p < 2e-16. Interesting, because the boxplot made them look not very different
+arch.temp.tukey <- TukeyHSD(arch.temp.anova)
+arch.temp.tukey
+
+#Light Intensity
+arch.light.anova <- aov(hobo$light ~ hobo$architecture)
+summary(arch.light.anova)
+#Again, big significance! p < 2e-16. 
+arch.light.tukey <- TukeyHSD(arch.light.anova)
+arch.light.tukey
+
+#Test for influence of cactus size (individual metrics and volume as a whole) on temperature for each architecture type
+#ANCOVA because explanatory variables are both categorical (architecture type) and continuous (size)
+arch.volume.temp.model <- lm(temp ~ architecture * volume, data = hobo)
+summary(arch.volume.temp.model)
+#ISSUE? Should "architecture" be split into wide format and each variable (top, middle and bottom) be treated as an indivdiual covariate?
+#Intercept here represents architecturebottom, because it was left out as the reference variable?
+#P-values tell us models were significant. Looking at the coefficients estimates, it appears that the middle is about 6 degree cooler than the bottom, and the top is about 5 degree cooler. But when you consider volume of the cactus as an influencing factor (:) then the middle is only 1 degree cooler than the bottom (but this model was not significant so ignore it), and the top is 8 degrees hotter (This makes so much sense!) Bigger cacti provide more shade to the bottom, smaller plants don't!!
+```
+
+
