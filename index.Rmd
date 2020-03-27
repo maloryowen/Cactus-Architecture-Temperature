@@ -9,6 +9,7 @@ output:
 ---
 ```{r, libraries, include=FALSE}
 library(ggplot2)
+library(plyr)
 library(dplyr)
 library(kableExtra)
 library(ggpubr)
@@ -23,7 +24,7 @@ register_google(key="")
 
 
 
-##Data
+#Data
 ```{r, datasets, warning=FALSE}
 #Bring in relevant datasets
 hobo <- read.csv("~/Masters/Cactus-Architecture-Temperature/data/cactus_architecture_temperature.csv")
@@ -64,8 +65,31 @@ summary.arch <-  mutate(summary.arch, sd.max.light = mean.light + sd.light)
 
 ```
 
-##Viz
-###Map
+##Reworked data for Cali-wide project
+```{r}
+#Make data look like this
+read.rds("~/Masters/Cactus-Architecture-Temperature/data/Panoche_micronet.rds")
+
+Mojave_micronet <- hobo
+
+#split date into month, day, and year
+Mojave_micronet <- separate(Mojave_micronet, date, sep="/", c("month", "day", "year"))
+
+#get additional columns 
+Mojave_micronet <- mutate(Mojave_micronet, plant = "cactus")
+Mojave_micronet <- unite(Mojave_micronet, col="microsite", architecture, plant, sep=" ")
+Mojave_micronet <- Mojave_micronet %>% mutate(region = "Mojave") %>% mutate(site = "Sunset") %>% mutate(sensor = "hobo") 
+
+#get columns of interest and rename to match reference dataset
+Mojave_micronet <- Mojave_micronet[,c(27, 28, 29, 14, 15, 4, 5, 6, 11, 10, 8, 9)]
+names(Mojave_micronet)[10] <-  "rep"
+write.csv(Mojave_micronet, "~/Masters/Cactus-Architecture-Temperature/data/Mojave_micronet.csv", row.names=FALSE)
+
+```
+
+
+#Viz
+##Map
 ```{r, Viz maps, warning=FALSE}
 #Map the cacti
 #basemap
@@ -80,7 +104,7 @@ arch.map
 
 ```
 
-###Graphs
+##Graphs
 ```{r, viz graphs, warning=FALSE}
 #Temperature throughout both experiments, raw data
 temp <- ggplot(hobo, aes(x = date.time, y = temp, colour = experiment)) +
@@ -131,8 +155,8 @@ light.mean.boxplot
 
 ```
 
-##Modelling
-###Temperature and Light Intensity
+#Stats
+##Temperature and Light Intensity
 ```{r, models, warning=FALSE}
 #Some simple modelling
 
