@@ -18,7 +18,6 @@ library(reshape)
 library(reshape2)
 library(ggmap)
 library(DT)
-install.packages("lubridate")
 
 register_google(key="")
 ```
@@ -76,15 +75,16 @@ Mojave_micronet <- hobo
 #split date into month, day, and year
 Mojave_micronet <- separate(Mojave_micronet, date, sep="/", c("month", "day", "year"))
 
-Mojave_micronet <- parse_date_time("9/1/01 9:00", "mdy_hm")
 
 #get additional columns 
 Mojave_micronet <- mutate(Mojave_micronet, microsite = "cactus")
 Mojave_micronet <- Mojave_micronet %>% mutate(region = "Mojave") %>% mutate(site = "Sunset") %>% mutate(sensor = "hobo") 
 
 #get columns of interest and rename to match reference dataset
-Mojave_micronet <- Mojave_micronet[,c(28, 29, 30, 14, 15, 4, 5, 6, 7, 27, 10, 8, 9)]
+Mojave_micronet <- Mojave_micronet[,c(29, 30, 31, 15, 16, 4, 5, 6, 12, 28, 10, 8, 9)]
 names(Mojave_micronet)[11] <-  "rep"
+names(Mojave_micronet)[9] <-  "hour"
+
 write.csv(Mojave_micronet, "~/Masters/Cactus-Architecture-Temperature/data/Mojave_micronet.csv", row.names=FALSE)
 
 ```
